@@ -1,99 +1,135 @@
-﻿#define _CRT_SECURE_NO_WARNINGS // Разрешаем использовать scanf и fopen в Visual Studio
-#include <stdlib.h> // Нужна для работы функции system
-#include <stdio.h>
-#include <math.h>
+﻿#include <iostream>
+#include <vector>
+#include <cmath>
+#include <fstream>
+#include <string>
+#include <omp.h> // Поддержка OpenMP
 
-/*
- * Функция для вычисления корней квадратного уравнения.
- * Принимает коэффициенты уравнения и выводит результат на экран.
- */
-void solveEquation(double a, double b, double c) {
-    // Вычисляем дискриминант по формуле: D = b^2 - 4ac
-    double discriminant = (b * b) - (4 * a * c);
+using namespace std;
 
-    // Условный оператор для проверки знака дискриминанта
-    if (discriminant > 0) {
-        double x1 = (-b + sqrt(discriminant)) / (2 * a);
-        double x2 = (-b - sqrt(discriminant)) / (2 * a);
-        printf("Два корня: x1 = %.2f, x2 = %.2f\n", x1, x2);
-    }
-    else if (discriminant == 0) {
-        double x = -b / (2 * a);
-        printf("Один корень: x = %.2f\n", x);
-    }
-    else {
-        printf("Вещественных корней нет (дискриминант меньше нуля).\n");
+// Функция для обработки массива (Задание 1 и 2)
+void processArrayParallel(const vector<double>& A, const vector<double>& B, vector<double>& C, int size) {
+    // Вычисления разделяются между потоками процессора
+#pragma omp parallel for
+    for (int i = 0; i < size; i++) {
+        C[i] = sqrt(abs(A[i])) + pow(B[i], 2); // Пример математической обработки
     }
 }
 
-/*
- * Функция для варианта Б: чтение из файла "input.txt" и запись в "output.txt"
- */
-void solveFromFile() {
-    // 1. Открываем файл input.txt для чтения ("r" - read)
-    FILE* fileIn = fopen("input.txt", "r");
-    if (fileIn == NULL) {
-        printf("Ошибка: не удалось открыть файл input.txt\n");
-        return;
-    }
-
-    double a = 0, b = 0, c = 0;
-    // Считываем три числа из файла с помощью fscanf (работает как scanf, но для файлов)
-    fscanf(fileIn, "%lf %lf %lf", &a, &b, &c);
-    fclose(fileIn); // Закрываем файл после чтения
-
-    // Повторяем математику дискриминанта
-    double discriminant = (b * b) - (4 * a * c);
-
-    // 2. Открываем (или создаем) файл output.txt для записи ("w" - write)
-    FILE* fileOut = fopen("output.txt", "w");
-    if (fileOut == NULL) {
-        printf("Ошибка: не удалось создать файл output.txt\n");
-        return;
-    }
-
-    // Записываем результат в файл с помощью fprintf (работает как printf, но пишет в файл)
-    if (discriminant > 0) {
-        double x1 = (-b + sqrt(discriminant)) / (2 * a);
-        double x2 = (-b - sqrt(discriminant)) / (2 * a);
-        fprintf(fileOut, "x1 = %.2f, x2 = %.2f\n", x1, x2);
-    }
-    else if (discriminant == 0) {
-        double x = -b / (2 * a);
-        fprintf(fileOut, "x = %.2f\n", x);
-    }
-    else {
-        fprintf(fileOut, "Вещественных корней нет.\n");
-    }
-
-    fclose(fileOut); // Закрываем файл после записи
-    printf("Готово! Результат сохранен в файл output.txt\n");
-}
-
-/*
- * Главная функция программы
- */
 int main() {
-    system("chcp 1251 > nul"); // Настройка русского языка
+    // Настройка русского языка в консоли
+    setlocale(LC_ALL, "Russian");
 
     int userChoice = 0;
-    printf("Выберите режим работы:\n");
-    printf("1 - Консоль (Ввод с клавиатуры)\n");
-    printf("2 - Файлы (Чтение из input.txt)\n");
-    printf("Ваш выбор: ");
-    scanf("%d", &userChoice);
+    cout << "Выберите режим работы:\n";
+    cout << "1 - Консоль (Ввод данных с клавиатуры)\n";
+    cout << "2 - Файл (Чтение из inputt.txt)\n";
+    cout << "Ваш выбор: ";
+    cin >> userChoice;
 
     if (userChoice == 1) {
-        double coefA = 0, coefB = 0, coefC = 0;
-        printf("\nВведите коэффициенты a, b и c через пробел: ");
-        scanf("%lf %lf %lf", &coefA, &coefB, &coefC);
-        solveEquation(coefA, coefB, coefC);
+        // ================= ЗАДАНИЕ 1: КОНСОЛЬНЫЙ ВВОД =================
+        int size;
+        cout << "Введите размер массивов: ";
+        cin >> size;
+
+        if (size <= 0) {
+            cout << "Некорректный размер!" << endl;
+            return 1;
+        }
+
+        vector<double> A(size);
+        vector<double> B(size);
+        vector<double> C(size);
+
+        cout << "Введите элементы массива A (" << size << " шт.): ";
+        for (int i = 0; i < size; i++) {
+            cin >> A[i];
+        }
+
+        cout << "Введите элементы массива B (" << size << " шт.): ";
+        for (int i = 0; i < size; i++) {
+            cin >> B[i];
+        }
+
+        double startTime = omp_get_wtime();
+        processArrayParallel(A, B, C, size);
+        double endTime = omp_get_wtime();
+
+        cout << "\n--- Результаты (Консоль) ---" << endl;
+        cout << "Массив C (Результат): ";
+        for (int i = 0; i < size; i++) {
+            cout << C[i] << " ";
+        }
+        cout << "\nВремя параллельного расчета: " << (endTime - startTime) << " сек." << endl;
+        cout << "Использовано потоков: " << omp_get_max_threads() << endl;
+
     }
     else if (userChoice == 2) {
-        solveFromFile();
+        // ================= ЗАДАНИЕ 2: РАБОТА С ФАЙЛОМ =================
+        ifstream inFile("inputt.txt");
+        if (!inFile.is_open()) {
+            cout << "Ошибка! Не удалось открыть файл inputt.txt" << endl;
+            cout << "Создайте файл inputt.txt в папке с проектом (там где ConsoleApplication1.cpp)." << endl;
+            return 1;
+        }
+
+        int size;
+        if (!(inFile >> size) || size <= 0) {
+            cout << "Ошибка чтения размера массива из файла!" << endl;
+            return 1;
+        }
+
+        vector<double> A(size);
+        vector<double> B(size);
+        vector<double> C(size);
+
+        // Читаем данные для массива A
+        for (int i = 0; i < size; i++) {
+            if (!(inFile >> A[i])) {
+                cout << "Ошибка чтения элементов массива A!" << endl;
+                return 1;
+            }
+        }
+
+        // Читаем данные для массива B
+        for (int i = 0; i < size; i++) {
+            if (!(inFile >> B[i])) {
+                cout << "Ошибка чтения элементов массива B!" << endl;
+                return 1;
+            }
+        }
+        inFile.close();
+
+        cout << "Данные из inputt.txt успешно прочитаны. Размер: " << size << endl;
+
+        double startTime = omp_get_wtime();
+        processArrayParallel(A, B, C, size);
+        double endTime = omp_get_wtime();
+
+        // Записываем результат в выходной файл
+        ofstream outFile("outputt.txt");
+        if (!outFile.is_open()) {
+            cout << "Ошибка создания файла output.txt!" << endl;
+            return 1;
+        }
+
+        outFile << "Размер: " << size << "\n";
+        outFile << "Массив C (Результат параллельного расчета):\n";
+        for (int i = 0; i < size; i++) {
+            outFile << C[i] << " ";
+        }
+        outFile << "\n\nВремя расчета: " << (endTime - startTime) << " сек.\n";
+        outFile << "Потоков процессора: " << omp_get_max_threads() << "\n";
+        outFile.close();
+
+        cout << "\n--- Результаты (Файл) ---" << endl;
+        cout << "Параллельный расчет окончен." << endl;
+        cout << "Результаты успешно сохранены в файл: outputt.txt" << endl;
+        cout << "Время параллельного расчета: " << (endTime - startTime) << " сек." << endl;
     }
     else {
-        printf("Неверный режим работы.\n");
+        cout << "Неверный режим работы!" << endl;
     }
 
     return 0;
