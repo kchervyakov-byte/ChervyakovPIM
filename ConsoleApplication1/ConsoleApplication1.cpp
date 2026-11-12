@@ -2,35 +2,53 @@
 #include <vector>
 #include <cmath>
 #include <fstream>
-#include <string>
-#include <omp.h> // Поддержка OpenMP
+#include <omp.h>
 
 using namespace std;
 
-// Функция для обработки массива (Задание 1 и 2)
-void processArrayParallel(const vector<double>& A, const vector<double>& B, vector<double>& C, int size) {
-    // Вычисления разделяются между потоками процессора
-#pragma omp parallel for
-    for (int i = 0; i < size; i++) {
-        C[i] = sqrt(abs(A[i])) + pow(B[i], 2); // Пример математической обработки
+// --- Функция для Задания 2: Расчет характеристик на заданном количестве потоков ---
+void calculateStatsOMP(const vector<double>& data, int num_threads, double& mean, double& std_dev, double& exec_time) {
+    int n = data.size();
+
+    // Устанавливаем нужное количество потоков для этого расчета
+    omp_set_num_threads(num_threads);
+
+    double start_time = omp_get_wtime();
+
+    // 1. Параллельный расчет суммы (для среднего арифметического)
+    double sum = 0.0;
+#pragma omp parallel for reduction(+:sum)
+    for (int i = 0; i < n; i++) {
+        sum += data[i];
     }
+    mean = sum / n;
+
+    // 2. Параллельный расчет суммы квадратов разностей (для среднеквадратического отклонения)
+    double variance_sum = 0.0;
+#pragma omp parallel for reduction(+:variance_sum)
+    for (int i = 0; i < n; i++) {
+        variance_sum += pow(data[i] - mean, 2);
+    }
+    std_dev = sqrt(variance_sum / n);
+
+    double end_time = omp_get_wtime();
+    exec_time = end_time - start_time;
 }
 
 int main() {
-    // Настройка русского языка в консоли
     setlocale(LC_ALL, "Russian");
 
     int userChoice = 0;
-    cout << "Выберите режим работы:\n";
-    cout << "1 - Консоль (Ввод данных с клавиатуры)\n";
-    cout << "2 - Файл (Чтение из inputt.txt)\n";
+    cout << "Выберите задание:\n";
+    cout << "1 - Задание 2: Сортировка массива\n";
+    cout << "2 - Задание 3: Статистика из файла (сравнение 1, 2, 4 потоков OMP)\n";
     cout << "Ваш выбор: ";
     cin >> userChoice;
 
     if (userChoice == 1) {
-        // ================= ЗАДАНИЕ 1: КОНСОЛЬНЫЙ ВВОД =================
+        // ================= ЗАДАНИЕ 2: СОРТИРОВКА =================
         int size;
-        cout << "Введите размер массивов: ";
+        cout << "Введите размер массива: ";
         cin >> size;
 
         if (size <= 0) {
@@ -38,98 +56,92 @@ int main() {
             return 1;
         }
 
-        vector<double> A(size);
-        vector<double> B(size);
-        vector<double> C(size);
-
-        cout << "Введите элементы массива A (" << size << " шт.): ";
+        vector<double> arr(size);
+        cout << "Введите элементы массива (" << size << " шт.): ";
         for (int i = 0; i < size; i++) {
-            cin >> A[i];
+            cin >> arr[i];
         }
 
-        cout << "Введите элементы массива B (" << size << " шт.): ";
-        for (int i = 0; i < size; i++) {
-            cin >> B[i];
+        // Сортировка пузырьком (Bubble Sort)
+        for (int i = 0; i < size - 1; i++) {
+            for (int j = 0; j < size - i - 1; j++) {
+                if (arr[j] > arr[j + 1]) {
+                    double temp = arr[j];
+                    arr[j] = arr[j + 1];
+                    arr[j + 1] = temp;
+                }
+            }
         }
 
-        double startTime = omp_get_wtime();
-        processArrayParallel(A, B, C, size);
-        double endTime = omp_get_wtime();
-
-        cout << "\n--- Результаты (Консоль) ---" << endl;
-        cout << "Массив C (Результат): ";
+        cout << "\nОтсортированный массив: ";
         for (int i = 0; i < size; i++) {
-            cout << C[i] << " ";
+            cout << arr[i] << " ";
         }
-        cout << "\nВремя параллельного расчета: " << (endTime - startTime) << " сек." << endl;
-        cout << "Использовано потоков: " << omp_get_max_threads() << endl;
+        cout << endl;
 
     }
     else if (userChoice == 2) {
-        // ================= ЗАДАНИЕ 2: РАБОТА С ФАЙЛОМ =================
+        // ================= ЗАДАНИЕ 3: СТАТИСТИКА + OMP =================
         ifstream inFile("inputt.txt");
         if (!inFile.is_open()) {
             cout << "Ошибка! Не удалось открыть файл inputt.txt" << endl;
-            cout << "Создайте файл inputt.txt в папке с проектом (там где ConsoleApplication1.cpp)." << endl;
             return 1;
         }
 
         int size;
         if (!(inFile >> size) || size <= 0) {
-            cout << "Ошибка чтения размера массива из файла!" << endl;
+            cout << "Ошибка чтения количества элементов из файла!" << endl;
             return 1;
         }
 
-        vector<double> A(size);
-        vector<double> B(size);
-        vector<double> C(size);
-
-        // Читаем данные для массива A
+        vector<double> data(size);
         for (int i = 0; i < size; i++) {
-            if (!(inFile >> A[i])) {
-                cout << "Ошибка чтения элементов массива A!" << endl;
-                return 1;
-            }
-        }
-
-        // Читаем данные для массива B
-        for (int i = 0; i < size; i++) {
-            if (!(inFile >> B[i])) {
-                cout << "Ошибка чтения элементов массива B!" << endl;
+            if (!(inFile >> data[i])) {
+                cout << "Ошибка: в файле меньше элементов, чем указано в размере!" << endl;
                 return 1;
             }
         }
         inFile.close();
 
-        cout << "Данные из inputt.txt успешно прочитаны. Размер: " << size << endl;
+        cout << "Данные из файла прочитаны. Количество элементов: " << size << "\n\n";
 
-        double startTime = omp_get_wtime();
-        processArrayParallel(A, B, C, size);
-        double endTime = omp_get_wtime();
+        // Массивы для фиксации результатов тестов производительности
+        int thread_modes[3] = { 1, 2, 4 };
+        double means[3], std_devs[3], times[3];
 
-        // Записываем результат в выходной файл
+        // Запуск вычислений последовательно для 1, 2 и 4 потоков
+        for (int i = 0; i < 3; i++) {
+            calculateStatsOMP(data, thread_modes[i], means[i], std_devs[i], times[i]);
+            cout << "Потоков: " << thread_modes[i]
+                << " | Среднее: " << means[i]
+                << " | Отклонение: " << std_devs[i]
+                << " | Время: " << times[i] << " сек.\n";
+        }
+
+        // Запись итогового отчета в файл outputt.txt
         ofstream outFile("outputt.txt");
         if (!outFile.is_open()) {
-            cout << "Ошибка создания файла output.txt!" << endl;
+            cout << "Ошибка создания файла outputt.txt!" << endl;
             return 1;
         }
 
-        outFile << "Размер: " << size << "\n";
-        outFile << "Массив C (Результат параллельного расчета):\n";
-        for (int i = 0; i < size; i++) {
-            outFile << C[i] << " ";
+        outFile << "--- РЕЗУЛЬТАТЫ ВЫЧИСЛЕНИЙ (ЗАДАНИЕ 3) ---\n";
+        outFile << "Размер выборки: " << size << "\n\n";
+
+        // Результаты вычислений (они одинаковы для всех режимов, берем первый)
+        outFile << "Среднее арифметическое: " << means[0] << "\n";
+        outFile << "Среднеквадратическое отклонение: " << std_devs[0] << "\n\n";
+
+        outFile << "--- СРАВНЕНИЕ ПРОИЗВОДИТЕЛЬНОСТИ ---\n";
+        for (int i = 0; i < 3; i++) {
+            outFile << "Потоков: " << thread_modes[i] << " -> Время расчета: " << times[i] << " сек.\n";
         }
-        outFile << "\n\nВремя расчета: " << (endTime - startTime) << " сек.\n";
-        outFile << "Потоков процессора: " << omp_get_max_threads() << "\n";
         outFile.close();
 
-        cout << "\n--- Результаты (Файл) ---" << endl;
-        cout << "Параллельный расчет окончен." << endl;
-        cout << "Результаты успешно сохранены в файл: outputt.txt" << endl;
-        cout << "Время параллельного расчета: " << (endTime - startTime) << " сек." << endl;
+        cout << "\nРезультаты и замеры времени успешно сохранены в файл: outputt.txt" << endl;
     }
     else {
-        cout << "Неверный режим работы!" << endl;
+        cout << "Неверный выбор!" << endl;
     }
 
     return 0;
