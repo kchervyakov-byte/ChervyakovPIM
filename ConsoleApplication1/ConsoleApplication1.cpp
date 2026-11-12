@@ -2,13 +2,14 @@
 #include <vector>
 #include <cmath>
 #include <fstream>
+#include <cstdlib>
 #include <omp.h>
 
 using namespace std;
 
-// --- Функция для Задания 2: Расчет характеристик на заданном количестве потоков ---
+// --- Функция для Задания 3: Расчет характеристик на заданном количестве потоков ---
 void calculateStatsOMP(const vector<double>& data, int num_threads, double& mean, double& std_dev, double& exec_time) {
-    int n = data.size();
+    int n = (int)data.size();
 
     // Устанавливаем нужное количество потоков для этого расчета
     omp_set_num_threads(num_threads);
@@ -27,7 +28,8 @@ void calculateStatsOMP(const vector<double>& data, int num_threads, double& mean
     double variance_sum = 0.0;
 #pragma omp parallel for reduction(+:variance_sum)
     for (int i = 0; i < n; i++) {
-        variance_sum += pow(data[i] - mean, 2);
+        double diff = data[i] - mean;
+        variance_sum += diff * diff; // Умножение работает быстрее и стабильнее pow() в OMP
     }
     std_dev = sqrt(variance_sum / n);
 
@@ -82,6 +84,19 @@ int main() {
     }
     else if (userChoice == 2) {
         // ================= ЗАДАНИЕ 3: СТАТИСТИКА + OMP =================
+
+        // --- АВТОГЕНЕРАЦИЯ ФАЙЛА НА 5 МЛН ЧИСЕЛ ---
+        int gen_size = 5000000;
+        ofstream genFile("inputt.txt");
+        if (genFile.is_open()) {
+            genFile << gen_size << "\n";
+            for (int i = 0; i < gen_size; i++) {
+                genFile << (rand() % 1000) / 10.0 << " ";
+            }
+            genFile.close();
+        }
+        // ------------------------------------------
+
         ifstream inFile("inputt.txt");
         if (!inFile.is_open()) {
             cout << "Ошибка! Не удалось открыть файл inputt.txt" << endl;
@@ -104,6 +119,11 @@ int main() {
         inFile.close();
 
         cout << "Данные из файла прочитаны. Количество элементов: " << size << "\n\n";
+
+        // Прогрев потоков OpenMP перед началом замеров
+#pragma omp parallel num_threads(4)
+        {
+        }
 
         // Массивы для фиксации результатов тестов производительности
         int thread_modes[3] = { 1, 2, 4 };
@@ -128,7 +148,6 @@ int main() {
         outFile << "--- РЕЗУЛЬТАТЫ ВЫЧИСЛЕНИЙ (ЗАДАНИЕ 3) ---\n";
         outFile << "Размер выборки: " << size << "\n\n";
 
-        // Результаты вычислений (они одинаковы для всех режимов, берем первый)
         outFile << "Среднее арифметическое: " << means[0] << "\n";
         outFile << "Среднеквадратическое отклонение: " << std_devs[0] << "\n\n";
 
